@@ -8,7 +8,7 @@
 #
 
 BEGIN {
-	$AI::NeuralNet::SOM::VERSION = "0.01";
+	$AI::NeuralNet::SOM::VERSION = "0.02";
 }
 
 package AI::NeuralNet::SOM;
@@ -29,13 +29,17 @@ our $VERSION = '0.1';
 
 $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 
-################################################################################
+#####################################################
 #
 # "Public" methods.
 #
-################################################################################
+#####################################################
 
-	# Simple constructor
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub new {
 		my $class = shift;
 		my $self = {};
@@ -48,7 +52,11 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		return $self;
 	}
 
-	# Initializer
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub initialize {
 	   my $self = shift;
 		my $xdim = shift; # X Dimension of map
@@ -123,6 +131,11 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		}
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub train {
 		my $self = shift;
 		my ($train_length, $alpha, $radius, $alpha_type, $data) = @_;
@@ -164,6 +177,11 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		}
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub qerror {
 		my $self = shift;
 		my $data = shift;
@@ -184,6 +202,11 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		return ($qerror/$patterns_count);
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub winner {
 		my $self = shift;
 		my $data = shift;
@@ -219,6 +242,11 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		return ($xwin, $ywin, sqrt($min_diff));
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub set_label {
 		my $self = shift;
 		my ($x, $y, $label) = @_;
@@ -226,11 +254,21 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		$self->{LABELS}->[$y * $self->{XDIM} + $x] =$label;
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub clear_all_labels {
 		my $self = shift;
 		$self->{LABELS} = ();
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub save {
 		my $self = shift;
 		my $file = shift;
@@ -240,9 +278,7 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		my $idim = $self->{IDIM};
 		my $topol = $self->{TOPOLOGY};
 		my $neigh = $self->{NEIGHBORHOOD};
-		my $random_seed = $self->{RANDOMSEED};
 		print $file "# Created by SOM.pm v0.01 by Voischev Alexander e-mail: voischev\@mail.ru\n";
-		print $file "# Random seed = $random_seed\n";
 		print $file "$idim $topol $xdim $ydim $neigh\n";
 
 		for my $z (0..$self->{XDIM}*$self->{YDIM}-1) {
@@ -256,13 +292,19 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		}
 	}
 
+	##################################################
+	#
+	#
+	#
+	##################################################
 	sub load {
 		my $self = shift;
 		my $file = shift;
 		my $header;
 
 		while (<$file>) {
-			if ($_!~/\#/) {
+			if (!/^ *#/) {
+				s/^ *//;
 				$header = $_;
 				last;
 			}
@@ -287,16 +329,398 @@ $AI::NeuralNet::SOM::INV_ALPHA_CONSTANT  = 100.0;
 		my @data;
 		my $z = 0;
 		while (<$file>) {
-			if (!/\#/) {
+			if (!/^ *#/) {
 				chomp();
-				@line = split(/ /);
+				if (/#/) {
+				    @line = split(/ /,$`);
+				}
+				else {
+				    @line = split(/ /);
+				}
 				@pattern = splice(@line, 0, $self->{IDIM});
 				push (@data, @pattern);
-				$self->{LABELS}->[$z] = $line[0];
+				if (defined($line[0])) {
+					$self->{LABELS}->[$z] = $line[0];
+				}
+				$z++;
 			}
 		}
 		$self->{MAP} = \@data;
 	}
+
+	##################################################
+	#
+	#
+	#
+	##################################################
+	sub umatrix {
+		my $self = shift;
+		my ($i,$j,$k,$count,$bx,$by,$bz);
+		my ($dx,$dy,$dz1,$dz2,$dz,$temp,$max,$min,$bw);
+		my @medtable;
+		my $tmp;
+
+		my @umat = ();
+
+		if ($self->{XDIM}<=0 or $self->{YDIM}<=0 or $self->{IDIM}<=0) {
+			return undef;
+		}
+		$max = 0;
+		$min = 0;
+
+		if ($self->{TOPOLOGY} eq 'rect') {
+		# Rectangular topology
+			for $j (0..$self->{YDIM}-1) {
+				for $i (0..$self->{XDIM}-1) {
+					$dx=0; $dy=0; $dz1=0; $dz2=0; $count=0;
+					$bx=0; $by=0; $bz=0;
+					for $k (0..$self->{IDIM}-1) {
+						if ($i < $self->{XDIM}-1) {
+							$temp = $self->map($i,$j,$k) - $self->map($i+1,$j,$k);
+							$dx += $temp ** 2;
+							$bx = 1;
+						}
+						if ($j < $self->{YDIM}-1) {
+							$temp = $self->map($i,$j,$k) - $self->map($i,$j+1,$k);
+							$dy += $temp ** 2;
+							$by = 1;
+						}
+						if ($j < $self->{YDIM}-1 and $i < $self->{XDIM}-1) {
+							$temp = $self->map($i,$j,$k) - $self->map($i+1,$j+1,$k);
+							$dz1 += $temp ** 2;
+							$temp = $self->map($i,$j+1,$k) - $self->map($i+1,$j,$k);
+							$dz2 += $temp ** 2;
+							$bz=1;
+						}
+					}
+					$dz = (sqrt($dz1)/sqrt(2.0)+sqrt($dz2)/sqrt(2.0))/2;
+		    
+					if ($bx) {
+						$umat[2*$i+1+(2*$j)*($self->{XDIM}*2-1)] = sqrt($dx);
+					}
+					if ($by) {
+						$umat[2*$i+(2*$j+1)*($self->{XDIM}*2-1)] = sqrt($dy);
+					}
+					if ($bz) {
+						$umat[2*$i+1+(2*$j+1)*($self->{XDIM}*2-1)] = $dz;
+					}
+				}
+			}
+		}
+		else {
+		# Hexagonal topology 
+			for $j (0..$self->{YDIM}-1) {
+				for $i (0..$self->{XDIM}-1) {
+					$dx=0; $dy=0; $dz=0; $count=0;
+					$bx=0; $by=0; $bz=0;
+					$temp=0;
+					if ($i<$self->{XDIM}-1)
+					{
+						for $k (0..$self->{IDIM}-1) {
+							$temp = $self->map($i,$j,$k) - $self->map($i+1,$j,$k);
+							$dx += $temp ** 2;
+							$bx = 1;
+						}
+					}
+					$temp=0;
+					if ($j < $self->{YDIM}-1) {
+						if ($j%2) {
+							for $k (0..$self->{IDIM}-1)
+							{
+								$temp = $self->map($i,$j,$k) - $self->map($i,$j+1,$k);
+								$dy += $temp ** 2;
+								$by=1;
+							}
+						}
+						else {
+							if ($i>0) {
+								for $k (0..$self->{IDIM}-1) {
+									$temp = $self->map($i,$j,$k) - $self->map($i-1,$j+1,$k);
+									$dy += $temp ** 2;
+									$by=1;
+								}
+							}
+							else {
+								$temp=0;
+							}
+						}
+					}
+					$temp=0;
+					if ($j < $self->{YDIM}-1) {
+						if (!($j%2)) {
+							for $k (0..$self->{IDIM}-1) {
+								$temp = $self->map($i,$j,$k) - $self->map($i,$j+1,$k);
+								$dz += $temp ** 2;
+							}
+							$bz=1;
+						}
+						else {
+							if ($i < $self->{XDIM}-1) {
+								for $k (0..$self->{IDIM}-1) {
+									$temp = $self->map($i,$j,$k) - $self->map($i+1,$j+1,$k);
+									$dz += $temp ** 2;
+								}
+								$bz=1;
+							}
+						}
+					}
+					else {
+						$temp=0;
+					}
+				
+					if ($bx) {
+						$umat[2*$i+1+(2*$j)*($self->{XDIM}*2-1)] = sqrt($dx);
+					}
+	   	 	   if ($by) {
+						if ($j%2) {
+							$umat[2*$i+(2*$j+1)*($self->{XDIM}*2-1)] = sqrt($dy);
+						}
+						else {
+							$umat[2*$i-1+(2*$j+1)*($self->{XDIM}*2-1)] = sqrt($dy);
+						}
+					}
+					if ($bz) {
+						if ($j%2) {
+							$umat[2*$i+1+(2*$j+1)*($self->{XDIM}*2-1)] = sqrt($dz);
+						}
+						else {
+							$umat[2*$i+(2*$j+1)*($self->{XDIM}*2-1)] = sqrt($dz);
+						}
+					}
+				}
+			}
+		}
+	
+		# Set the values corresponding to the model vectors themselves
+		# to medians of the surrounding values
+		if ($self->{TOPOLOGY} eq 'rect') {
+		# Rectangular topology
+		# medians of the 4-neighborhood
+			for ($j=0; $j<$self->{YDIM} * 2 - 1; $j+=2) {
+				for ($i=0;$i<$self->{XDIM} * 2 - 1; $i+=2) {
+					if($i>0 and $j>0 and $i<$self->{XDIM} * 2 - 2 and $j<$self->{YDIM} * 2 - 2) {
+					# in the middle of the map
+						$medtable[0] = $umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1] = $umat[$i+1+$j*($self->{XDIM}*2-1)];
+						$medtable[2] = $umat[$i+($j-1)*($self->{XDIM}*2-1)];
+						$medtable[3] = $umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						$#medtable = 3;
+						@medtable = sort{$a <=> $b} @medtable;
+						# Actually mean of two median values
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($medtable[1]+$medtable[2])/2.0;
+					}
+					elsif($j==0 and $i>0 and $i<$self->{XDIM} * 2 - 2) {
+					# in the upper edge
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						$#medtable = 2;
+						@medtable = sort{$a<=>$b} @medtable;
+						$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+					}
+					elsif($j==$self->{YDIM} * 2 - 2 and $i>0 and $i<$self->{XDIM} * 2 - 2) {
+					# in the lower edge
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						$medtable[2]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+						$#medtable = 2;
+						@medtable = sort{$a<=>$b} @medtable;
+						$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+					}
+					elsif($i==0 and $j>0 and $j<$self->{YDIM} * 2 - 2) {
+					# in the left edge
+						$medtable[0]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+						$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						$#medtable = 2;
+						@medtable = sort{$a<=>$b} @medtable;
+						$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+					}
+					elsif($i==$self->{XDIM} * 2 - 2 and $j>0 and $j<$self->{YDIM} * 2 - 2) {
+					# in the right edge
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+						$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						$#medtable = 2;
+						@medtable = sort{$a<=>$b} @medtable;
+						$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+					}
+					elsif($i==0 && $j==0) {
+					# the upper left-hand corner
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i+1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j+1)*($self->{XDIM}*2-1)])/2.0;
+					}
+					elsif($i==$self->{XDIM} * 2 - 2 and $j==0) {
+					# the upper right-hand corner
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i-1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j+1)*($self->{XDIM}*2-1)])/2.0;
+					}
+					elsif($i==0 and $j==$self->{YDIM} * 2 - 2) {
+					# the lower left-hand corner
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i+1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j-1)*($self->{XDIM}*2-1)])/2.0;
+					}
+					elsif($i==$self->{XDIM} * 2 - 2 and $j==$self->{YDIM} * 2 - 2) {
+					# the lower right-hand corner
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i-1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j-1)*($self->{XDIM}*2-1)])/2.0;
+					}
+				}
+			}
+		}
+		else {
+		# Hexagonal topology
+			for ($j=0; $j<$self->{YDIM}*2-1; $j+=2) {
+				for ($i=0; $i<$self->{XDIM}*2-1; $i+=2) {
+					if($i>0 and $j>0 and $i<$self->{XDIM} * 2 - 2 and $j<$self->{YDIM} * 2 - 2) {
+					# in the middle of the map
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						if(!($j%4)) {
+							$medtable[2]=$umat[$i-1+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[3]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[4]=$umat[$i-1+($j+1)*($self->{XDIM}*2-1)];
+							$medtable[5]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						}
+						else {
+							$medtable[2]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[3]=$umat[$i+1+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[4]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+							$medtable[5]=$umat[$i+1+($j+1)*($self->{XDIM}*2-1)];
+						}
+						$#medtable = 5;
+						@medtable = sort{$a<=>$b} @medtable;
+						# Actually mean of two median values
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($medtable[2]+$medtable[3])/2;
+					}
+					elsif($j==0 and $i>0 and $i<$self->{XDIM} * 2 - 2) {
+					# in the upper edge
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						$medtable[3]=$umat[$i-1+($j+1)*($self->{XDIM}*2-1)];
+						$#medtable = 3;
+						@medtable = sort{$a<=>$b} @medtable;
+						# Actually mean of two median values
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($medtable[1]+$medtable[2])/2;
+					}
+					elsif($j==$self->{YDIM} * 2 - 2 and $i>0 and $i<$self->{XDIM} * 2 - 2) {
+					# in the lower edge
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						if(!($j%4)) {
+							$medtable[2]=$umat[$i-1+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[3]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+						}
+						else {
+							$medtable[2]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[3]=$umat[$i+1+($j-1)*($self->{XDIM}*2-1)];
+						}
+						$#medtable = 3;
+						@medtable = sort{$a<=>$b} @medtable;
+						# Actually mean of two median values
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($medtable[1]+$medtable[2])/2;
+					}
+					elsif($i==0 and $j>0 and $j<$self->{YDIM} * 2 - 2) {
+					# in the left edge
+						$medtable[0]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+						if(!($j%4)) {
+							$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+							$#medtable = 2;
+							@medtable = sort{$a<=>$b} @medtable;
+							$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+						}
+						else {
+							$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[2]=$umat[$i+1+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[3]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+							$medtable[4]=$umat[$i+1+($j+1)*($self->{XDIM}*2-1)];
+							$#medtable = 4;
+							@medtable = sort{$a<=>$b} @medtable;
+							$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[2];
+						}
+					}
+					elsif($i==$self->{XDIM} * 2 - 2 and $j>0 and $j<$self->{YDIM} * 2 - 2) {
+					# in the right edge
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						if($j%4) {
+							$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+							$#medtable = 2;
+							@medtable = sort{$a<=>$b} @medtable;
+							$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+						}
+						else {
+							$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[2]=$umat[$i-1+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[3]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+							$medtable[4]=$umat[$i-1+($j+1)*($self->{XDIM}*2-1)];
+							$#medtable = 4;
+							@medtable = sort{$a<=>$b} @medtable;
+							$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[2];
+						}
+					}
+					elsif($i==0 and $j==0) {
+					# the upper left-hand corner
+						$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i+1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j+1)*($self->{XDIM}*2-1)])/2.0;
+					}
+					elsif($i==$self->{XDIM} * 2 - 2 and $j==0) {
+					# the upper right-hand corner
+						$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+						$medtable[1]=$umat[$i-1+($j+1)*($self->{XDIM}*2-1)];
+						$medtable[2]=$umat[$i+($j+1)*($self->{XDIM}*2-1)];
+						$#medtable = 2;
+						@medtable = sort{$a<=>$b} @medtable;
+						$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+					}
+					elsif($i==0 and $j==$self->{YDIM} * 2 - 2) {
+					# the lower left-hand corner
+						if(!($j%4)) {
+							$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i+1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j-1)*($self->{XDIM}*2-1)])/2.0;
+						}
+						else {
+							$medtable[0]=$umat[$i+1+$j*($self->{XDIM}*2-1)];
+							$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[2]=$umat[$i+1+($j-1)*($self->{XDIM}*2-1)];
+							$#medtable = 2;
+							@medtable = sort{$a<=>$b} @medtable;
+							$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+						}
+					}
+					elsif($i==$self->{XDIM} * 2 - 2 and $j==$self->{YDIM} * 2 - 2) {
+					# the lower right-hand corner
+						if($j%4) {
+							$umat[$i+$j*($self->{XDIM}*2-1)]=($umat[$i-1+$j*($self->{XDIM}*2-1)]+$umat[$i+($j-1)*($self->{XDIM}*2-1)])/2.0;
+						}
+						else {
+							$medtable[0]=$umat[$i-1+$j*($self->{XDIM}*2-1)];
+							$medtable[1]=$umat[$i+($j-1)*($self->{XDIM}*2-1)];
+							$medtable[2]=$umat[$i-1+($j-1)*($self->{XDIM}*2-1)];
+							$#medtable = 2;
+							@medtable = sort{$a<=>$b} @medtable;
+							$umat[$i+$j*($self->{XDIM}*2-1)]=$medtable[1];
+						}
+					}
+				}
+			}
+		}
+
+		# scale values to (0..1)
+
+		my @umat_sort = sort{$a<=>$b} @umat;
+		$bw = $umat_sort[$#umat_sort] - $umat_sort[0];
+		$min = $umat_sort[0];
+		for $i (0..$self->{XDIM} * 2 - 2) {
+			for $j (0..$self->{YDIM} * 2 - 2) {
+				$umat[$i+$j*($self->{XDIM}*2-1)] = ($umat[$i+$j*($self->{XDIM}*2-1)]-$min)/$bw;
+			}
+		}
+
+		return \@umat;
+	}
+
+	##################################################
+	#
+	#
+	#
+	##################################################
 
 	sub x_dim {
 		my $self = shift;
@@ -900,6 +1324,32 @@ map topology.
 
 Loads the Self-Organazing Map from file which represented as descriptor *FILE.
 
+=item $som-E<gt>umatrix;
+
+Calculates Umatrix for existing map and returns a reference to array that contains Umatrix data.
+
+Umatrix is a way of representing the distances between reference vectors of neighboring map units.
+Although being a somewhat laborious task to calculate it can effectively be used to visualize the
+map in an interpretable manner.
+
+Umatrix algorithm calculates the distances between the neighboring neurons and stores them
+in a grid (matrix) that corresponds to the used topology type. From that grid, a proper
+visualization can be generated by picking the values for each neuron distance
+(4 for rectangular and 6 for hexagonal topology). The distance values are scaled to the range
+between 0 and 1 and are shown as colors when the Umatrix is visualized.
+
+Example:
+
+	...
+	$umat = $som->umatrix;
+	for $j (0..$som->y_dim*2-2) {
+		for $i (0..$som->x_dim*2-2) {
+			print "$umat->[$j*($som->x_dim*2-1)+$i] ";
+		}
+		print "\n";
+	}
+	...
+
 =item $som-E<gt>x_dim;
 
 Returns the x dimention of map.
@@ -952,6 +1402,12 @@ there are probably bugs in here which I just have not found yet. If you find bug
 appreciate it greatly if you could report them to me at F<E<lt>voischev@mail.ruE<gt>>,
 or, even better, try to patch them yourself and figure out why the bug is being buggy, and
 send me the patched code, again at F<E<lt>voischev@mail.ruE<gt>>. 
+
+=head1 HISTORY
+
+AI-NeuralNet-SOM-0.01 - The first alpha version.
+
+AI-NeuralNet-SOM-0.02 - fixed bugs in "load" method and added new method "umatrix".
 
 =head1 AUTHOR
 
