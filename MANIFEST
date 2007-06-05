@@ -1,5 +1,7 @@
 Changes
 Makefile.PL
 MANIFEST
-SOM.pm
+README
 t/som.t
+lib/AI/NeuralNet/SOM.pm
+META.yml                                 Module meta-data (added by MakeMaker)
