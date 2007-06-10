@@ -2,6 +2,10 @@ Changes
 Makefile.PL
 MANIFEST
 README
-t/som.t
+t/rect.t
+t/hexa.t
 lib/AI/NeuralNet/SOM.pm
+lib/AI/NeuralNet/SOM/Rect.pm
+lib/AI/NeuralNet/SOM/Hexa.pm
+lib/AI/NeuralNet/SOM/Utils.pm
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -17,8 +17,8 @@ AI::NeuralNet::SOM - Perl extension for Kohonen Maps
 =head1 SYNOPSIS
 
   use AI::NeuralNet::SOM;
-  my $nn = new AI::NeuralNet::SOM (output_dim => "5x6",
-                                     input_dim  => 3);
+  my $nn = new AI::NeuralNet::SOM::Rect (output_dim => "5x6",
+                                         input_dim  => 3);
   $nn->initialize;
   $nn->train (30, 
     [ 3, 2, 4 ], 
@@ -26,6 +26,11 @@ AI::NeuralNet::SOM - Perl extension for Kohonen Maps
     [ 0, 4, -3]);
 
   print $nn->as_data;
+
+  my $nn = new AI::NeuralNet::SOM::Hexa (output_dim => 6,
+                                         input_dim  => 4);
+  $nn->initialize ( [ 0, 0, 0, 0 ] );  # all get this value
+  $nn->value (3, 2, [ 1, 1, 1, 1 ]);   # change value for a neuron
 
 =head1 DESCRIPTION
 
@@ -35,7 +40,7 @@ together with some visualisation software. And while it is not (yet)
 optimized for speed, some consideration has been given that it is not
 overly slow.
 
-Particular emphasis has be given that the package plays nicely with
+Particular emphasis has been given that the package plays nicely with
 others. So no use of files, no arcane dependencies, etc.
 
 =head2 Scenario
@@ -59,53 +64,36 @@ The constructor takes arguments:
 
 =over
 
-=item C<output_dim> : (mandatory, no default)
-
-A string of the form "3x4" defining the X and the Y dimensions.
-
 =item C<input_dim> : (mandatory, no default)
 
-A positive integer specifying the dimension of the sample vectors (and
-hence that of the vectors in the grid).
+A positive integer specifying the dimension of the sample vectors (and hence that of the vectors in
+the grid).
 
 =item C<learning_rate>: (optional, default C<0.1>)
 
-This is a magic number which influence how strongly the vectors in the
-grid can be influenced. Higher movement can mean faster learning if
-the clusters are very pronounced. If not, then the movement is like
-noise and the convergence is not good. To mediate that effect, the
+This is a magic number which influence how strongly the vectors in the grid can be
+influenced. Higher movement can mean faster learning if the clusters are very pronounced. If not,
+then the movement is like noise and the convergence is not good. To mediate that effect, the
 learning rate is reduced over the iterations.
+
+=item C<sigma0>: (optional, defaults to radius)
+
+A non-negative number representing the start value for the learning radius. It starts big, but then
+narrows as learning time progresses. This makes sure that the network finally has only localized
+changes.
 
 =back
 
+Subclasses will (re)define some of these parameters and add others:
+
 Example:
 
-    my $nn = new AI::NeuralNet::SOM (output_dim => "5x6",
-				     input_dim  => 3);
+    my $nn = new AI::NeuralNet::SOM::Rect (output_dim => "5x6",
+				           input_dim  => 3);
 
 =cut
 
-sub new {
-    my $class = shift;
-    my %options = @_;
-    my $self = bless { %options }, $class;
-
-    if ($self->{output_dim} =~ /(\d+)x(\d+)/) {
-	$self->{_X} = $1 and $self->{_Y} = $2;
-    } else {
-	die "output dimension does not have format MxN";
-    }
-    if ($self->{input_dim} > 0) {
-	$self->{_Z} = $self->{input_dim};
-    } else {
-	die "input dimension must be positive integer";
-    }
-
-    ($self->{_Sigma0}) = map { $_ / 2 } sort {$b <= $a } ($self->{_X}, $self->{_Y});     # impact distance, start value
-    $self->{_L0} = $options{learning_rate} || 0.1;                                       # learning rate, start value
-
-    return $self;
-}
+sub new { die; }
 
 =pod
 
@@ -117,36 +105,26 @@ sub new {
 
 I<$nn>->initialize
 
-You need to initialize all vectors in the map.
+You need to initialize all vectors in the map before training. There are several options
+how this is done:
 
-By default, the vectors will be initialized with random values, so all
-point chaotically into different directions.  This may not be overly
-clever as it may slow down the convergence process unnecessarily.
+=over
 
-TODO: provide more flexibility to initialize with eigenvectors
+=item providing data vectors
 
-=cut
+If you provide a list of vectors, these will be used in turn to seed the neurons. If the list is
+shorter than the number of neurons, the list will be started over. That way it is trivial to
+zero everything:
 
-sub _randomized {
-    return rand( 1 ) - 0.5;
-}
+  $nn->initialize ( [ 0, 0, 0 ] );
 
-sub _zero {
-    return 0;
-}
+=item providing no data
 
-sub initialize {
-    my $self = shift;
-    my $meth = shift || \&_randomized;
+Then all vectors will get randomized values (in the range [ -0.5 .. 0.5 ].
 
-    for my $x (0 .. $self->{_X}-1) {
-	for my $y (0 .. $self->{_Y}-1) {
-	    $self->{map}->[$x]->[$y] = [ map { &$meth() } 1..$self->{_Z} ];
-	}
-    }
-}
+=back
 
-=pod
+TODO: Eigenvectors
 
 =item I<train>
 
@@ -164,84 +142,9 @@ Example:
                [ -1, -1, -1 ], 
                [ 0, 4, -3]);
 
-TODO: expose distance
+TODO: @@@@@@ expose error
 
 =cut
-
-
-sub _distance { 
-    my ($V, $W) = (shift,shift);
-
-#
-#                       __________________
-#                      / n-1          2
-#        Distance  =  /   E  ( V  -  W )
-#                   \/    0     i     i
-#
-
-#warn "bef dist ".Dumper ($V, $W);
-    my $d2 = 0;
-    map { $d2 += $_ }
-        map { $_ * $_ }
-	map { $V->[$_] - $W->[$_] } 
-        (0 .. $#$W);
-#warn "d2 $d2";
-    return sqrt($d2);
-}
-
-
-sub _bmu {                                                                     # http://www.ai-junkie.com/ann/som/som2.html
-    my $self   = shift;
-    my $sample = shift;
-
-    my $closest;                                                               # [value, x,y] value and co-ords of closest match
-    for my $x (0 .. $self->{_X}-1) {
-	for my $y (0 .. $self->{_Y}-1){
-	    my $distance = _distance ($self->{map}->[$x]->[$y], $sample);
-#warn "distance $x $y: $distance";
-	    $closest = [$distance,0,0]   unless $closest;
-	    $closest = [$distance,$x,$y] if $distance < $closest->[0];
-#warn "closest ".Dumper $closest;
-	}
-    }
-    return ($closest->[1], $closest->[2]);
-}
-
-
-sub _neighbors {                                                               # http://www.ai-junkie.com/ann/som/som3.html
-    my $self = shift;
-    my $sigma = shift;
-    my $X     = shift;
-    my $Y     = shift;     
-
-    my @neighbors;
-    for my $x (0 .. $self->{_X}-1) {
-        for my $y (0 .. $self->{_Y}-1){
-            my $distance = sqrt ( ($x - $X) ** 2 + ($y - $Y) ** 2 );
-	    next if $distance > $sigma;
-	    push @neighbors, [ $distance, $x, $y ];                                    # we keep the distances
-	}
-    }
-    return \@neighbors;
-}
-
-
-sub _adjust {                                                                           # http://www.ai-junkie.com/ann/som/som4.html
-    my $self  = shift;
-    my $l     = shift;                                                                  # the learning rate
-    my $sigma = shift;                                                                  # the current radius
-    my $unit  = shift;                                                                  # which unit to change
-    my ($d, $x, $y) = @$unit;                                                           # it contains the distance
-    my $v     = shift;                                                                  # the vector which makes the impact
-
-    my $w     = $self->{map}->[$x]->[$y];                                               # find the data behind the unit
-    my $theta = exp ( - ($d ** 2) / (2 * $sigma ** 2));                                 # gaussian impact (using distance and current radius)
-
-    foreach my $i (0 .. $#$w) {                                                         # adjusting values
-	$w->[$i] = $w->[$i] + $theta * $l * ( $v->[$i] - $w->[$i] );
-    }
-}
-
 
 sub train {
     my $self   = shift;
@@ -256,13 +159,56 @@ sub train {
 
 	my $sample = @_ [ int (rand (scalar @_) ) ];                                    # take random sample
 
-	my @bmu = _bmu ($self, $sample);                                                # find the best matching unit
+	my @bmu = $self->bmu ($sample);                                                 # find the best matching unit
 #warn "bmu ".Dumper \@bmu;
-	my $neighbors = _neighbors ($self, $sigma, @bmu);                               # find its neighbors
+	my $neighbors = $self->neighbors ($sigma, @bmu);                                # find its neighbors
 #warn "neighbors ".Dumper $neighbors;
 	map { _adjust ($self, $l, $sigma, $_, $sample) } @$neighbors;                   # bend them like Beckham
+#warn Dumper $self;
     }
 }
+
+sub _adjust {                                                                           # http://www.ai-junkie.com/ann/som/som4.html
+    my $self  = shift;
+    my $l     = shift;                                                                  # the learning rate
+    my $sigma = shift;                                                                  # the current radius
+    my $unit  = shift;                                                                  # which unit to change
+    my ($x, $y, $d) = @$unit;                                                           # it contains the distance
+    my $v     = shift;                                                                  # the vector which makes the impact
+
+    my $w     = $self->{map}->[$x]->[$y];                                               # find the data behind the unit
+    my $theta = exp ( - ($d ** 2) / (2 * $sigma ** 2));                                 # gaussian impact (using distance and current radius)
+
+    foreach my $i (0 .. $#$w) {                                                         # adjusting values
+	$w->[$i] = $w->[$i] + $theta * $l * ( $v->[$i] - $w->[$i] );
+    }
+}
+
+=pod
+
+=item I<bmu>
+
+(I<$x>, I<$y>, I<$distance>) = I<$nn>->bmu (I<$vector>)
+
+This method finds the I<best matching unit>, i.e. that neuron which is closest to the vector passed
+in. The method returns the coordinates and the actual distance.
+
+=cut
+
+sub bmu { die; }
+
+=pod
+
+=item I<neighbors>
+
+I<$ns> = I<$nn>->neighbors (I<$sigma>, I<$x>, I<$y>)
+
+Finds all neighbors of (X, Y) with a distance smaller than SIGMA. Returns a list reference of (X, Y,
+distance) triples.
+
+=cut
+
+sub neighbors { die; }
 
 =pod
 
@@ -270,38 +216,36 @@ sub train {
 
 I<$radius> = I<$nn>->radius
 
-Returns the initial I<radius> of the map.
-
-=cut
-
-sub radius {
-    my $self = shift;
-    return $self->{_Sigma0};
-}
-
-=pod
+Returns the I<radius> of the map. Different topologies interpret this differently.
 
 =item I<map>
 
 I<$m> = I<$nn>->map
 
-This method returns the 2-dimensional array of vectors in the grid (as
-a reference to an array of references to arrays of vectors.
-
-Example:
-
-   my $m = $nn->map;
-   for my $x (0 .. 5) {
-       for my $y (0 .. 4){
-           warn "vector at $x, $y: ". Dumper $m->[$x]->[$y];
-       }
-   }
+This method returns a reference to the map data. See the appropriate subclass of the data
+representation.
 
 =cut
 
 sub map {
     my $self = shift;
     return $self->{map};
+}
+
+=pod
+
+=item I<value>
+
+Set or get the current vector value for a particular neuron. The neuron is addressed via its
+coordinates.
+
+=cut
+
+sub value {
+    my $self    = shift;
+    my ($x, $y) = (shift, shift);
+    my $v       = shift;
+    return $v ? $self->{map}->[$x]->[$y] = $v : $self->{map}->[$x]->[$y];
 }
 
 =pod
@@ -314,30 +258,7 @@ This methods creates a pretty-print version of the current vectors.
 
 =cut
 
-sub as_string {
-    my $self = shift;
-    my $s = '';
-
-    $s .= "    ";
-    for my $x (0..$self->{_X}){
-	$s .= sprintf ("   %02d ",$x);
-    }
-    $s .= sprintf "\n","-"x107,"\n";
-    
-    my $dim = scalar @{ $self->{map}->[0]->[0] };
-    
-    for my $x (0 .. $self->{_X}-1) {
-	for my $w ( 0 .. $dim-1 ){
-	    $s .= sprintf ("%02d | ",$x);
-	    for my $y (0 .. $self->{_Y}-1){
-		$s .= sprintf ("% 2.2f ", $self->{map}->[$x]->[$y]->[$w]);
-	    }
-	    $s .= sprintf "\n";
-	}
-	$s .= sprintf "\n";
-    }
-    return $s;
-}
+sub as_string { die; }
 
 =pod
 
@@ -350,21 +271,7 @@ row. This can be fed into gnuplot, for instance.
 
 =cut
 
-sub as_data {
-    my $self = shift;
-    my $s = '';
-
-    my $dim = scalar @{ $self->{map}->[0]->[0] };
-    for my $x (0 .. $self->{_X}-1) {
-	for my $y (0 .. $self->{_Y}-1){
-	    for my $w ( 0 .. $dim-1 ){
-		$s .= sprintf ("\t%f", $self->{map}->[$x]->[$y]->[$w]);
-	    }
-	    $s .= sprintf "\n";
-	}
-    }
-    return $s;
-}
+sub as_data { die; }
 
 =pod
 
@@ -389,10 +296,24 @@ at your option, any later version of Perl 5 you may have available.
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 1;
 
 __END__
 
+
+sub bmu {
+    my $self = shift;
+    my $sample = shift;
+
+    my $closest;                                                               # [x,y, distance] value and co-ords of closest match
+    foreach my $coor ($self->_get_coordinates) {                               # generate all coord pairs, not overly happy with that
+	my ($x, $y) = @$coor;
+	my $distance = _vector_distance ($self->{map}->[$x]->[$y], $sample);   # || Vi - Sample ||
+	$closest = [0,  0,  $distance] unless $closest;
+	$closest = [$x, $y, $distance] if $distance < $closest->[2];
+    }
+    return @$closest;
+}
 
