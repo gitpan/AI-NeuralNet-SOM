@@ -3,15 +3,15 @@
 # change 'tests => 1' to 'tests => last_test_to_print';
 
 use Test::More qw(no_plan);
-BEGIN { use_ok('AI::NeuralNet::SOM::Rect') };
+BEGIN { use_ok('AI::NeuralNet::SOM::Torus') };
 
 ######
 use Data::Dumper;
 
 {
-    my $nn = new AI::NeuralNet::SOM::Rect (output_dim => "5x6",
-					   input_dim  => 3);
-    ok ($nn->isa ('AI::NeuralNet::SOM::Rect'), 'class');
+    my $nn = new AI::NeuralNet::SOM::Torus (output_dim => "5x6",
+					    input_dim  => 3);
+    ok ($nn->isa ('AI::NeuralNet::SOM::Torus'), 'class');
     is ($nn->{_X}, 5, 'X');
     is ($nn->{_Y}, 6, 'Y');
     is ($nn->{_Z}, 3, 'Z');
@@ -20,8 +20,31 @@ use Data::Dumper;
 }
 
 {
-    my $nn = new AI::NeuralNet::SOM::Rect (output_dim => "5x6",
-					   input_dim  => 3);
+    my $nn = new AI::NeuralNet::SOM::Torus (output_dim => "5x6",
+					    input_dim  => 3);
+
+    ok (eq_set ( $nn->neighbors (1, 0, 0),
+		   [
+		    [ 0, 0, '0' ],
+		    [ 0, 1, '1' ],
+		    [ 0, 5, '1' ],
+		    [ 1, 0, '1' ],
+		    [ 4, 0, '1' ]
+		   ]), 'neighbors 4+1');
+
+    ok (eq_set ( $nn->neighbors (1, 3, 2),
+		   [
+		    [ 2, 2, '1' ],
+		    [ 3, 1, '1' ],
+		    [ 3, 2, '0' ],
+		    [ 3, 3, '1' ],
+		    [ 4, 2, '1' ]
+		   ]), 'neighbors 4+1');
+}
+
+{
+    my $nn = new AI::NeuralNet::SOM::Torus (output_dim => "5x6",
+					    input_dim  => 3);
     $nn->initialize;
 #    print Dumper $nn;
 #    exit;

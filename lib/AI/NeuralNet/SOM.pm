@@ -120,7 +120,7 @@ zero everything:
 
 =item providing no data
 
-Then all vectors will get randomized values (in the range [ -0.5 .. 0.5 ].
+Then all vectors will get randomized values (in the range [ -0.5 .. 0.5 ]).
 
 =back
 
@@ -128,12 +128,12 @@ TODO: Eigenvectors
 
 =item I<train>
 
-I<$nn>->train ( I<$epochs>, I<@samples> )
+I<$nn>->train ( I<$epochs>, I<@vectors> )
 
-The training uses the sample vectors to make the network learn. Each
-vector is simply a reference to an array of values.
+The training uses the list of sample vectors to make the network learn. Each vector is simply a
+reference to an array of values. Individual vectors are
 
-The C<epoch> parameter controls how often the process is repeated.
+The C<epoch> parameter controls how many vectors are processed.
 
 Example:
 
@@ -199,6 +199,14 @@ sub bmu { die; }
 
 =pod
 
+=item I<mse>
+
+I<$mse> = I<$nn>->mse (I<@vectors>)
+
+=cut
+
+=pod
+
 =item I<neighbors>
 
 I<$ns> = I<$nn>->neighbors (I<$sigma>, I<$x>, I<$y>)
@@ -212,7 +220,22 @@ sub neighbors { die; }
 
 =pod
 
-=item I<radius>
+=item I<output_dim> (read-only)
+
+I<$dim> = I<$nn>->output_dim
+
+Returns the output dimensions of the map as passed in at constructor time.
+
+=cut
+
+sub output_dim {
+    my $self = shift;
+    return $self->{output_dim};
+}
+
+=pod
+
+=item I<radius> (read-only)
 
 I<$radius> = I<$nn>->radius
 
@@ -296,7 +319,7 @@ at your option, any later version of Perl 5 you may have available.
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 1;
 

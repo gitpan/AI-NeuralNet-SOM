@@ -1,5 +1,9 @@
 Revision history for Perl extension AI::NeuralNet::SOM.
 
+0.03  Do 14. Jun 21:07:54 CEST 2007
+	- added output_dim method
+	- added ::Torus subclass of ::Rect
+
 0.02  Sa 9. Jun 17:55:23 CEST 2007
 	- split ::SOM.pm into ::SOM::Rect and ::SOM::Hexa
 	- added more features for initialization

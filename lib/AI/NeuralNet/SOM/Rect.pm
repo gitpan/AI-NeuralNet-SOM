@@ -74,8 +74,6 @@ sub new {
 
 =head2 Methods
 
-=over
-
 =cut
 
 sub initialize {
@@ -133,6 +131,8 @@ sub neighbors {                                                               # 
 }
 
 =pod
+
+=over
 
 =item I<radius>
 
