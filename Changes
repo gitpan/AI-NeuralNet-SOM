@@ -1,5 +1,9 @@
 Revision history for Perl extension AI::NeuralNet::SOM.
 
+0.04  ????
+	- added labels get/set
+	- added mean_error function
+
 0.03  Do 14. Jun 21:07:54 CEST 2007
 	- added output_dim method
 	- added ::Torus subclass of ::Rect

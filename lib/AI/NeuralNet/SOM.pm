@@ -16,7 +16,7 @@ AI::NeuralNet::SOM - Perl extension for Kohonen Maps
 
 =head1 SYNOPSIS
 
-  use AI::NeuralNet::SOM;
+  use AI::NeuralNet::SOM::Rect;
   my $nn = new AI::NeuralNet::SOM::Rect (output_dim => "5x6",
                                          input_dim  => 3);
   $nn->initialize;
@@ -25,12 +25,26 @@ AI::NeuralNet::SOM - Perl extension for Kohonen Maps
     [ -1, -1, -1 ],
     [ 0, 4, -3]);
 
-  print $nn->as_data;
+  my @mes = $nn->train (30, ...);      # learn about the smallest errors
+                                       # during training
 
+  print $nn->as_data;                  # dump the raw data
+  print $nn->as_string;                # prepare a somehow formatted string
+
+  use AI::NeuralNet::SOM::Torus;
+  # similar to above
+
+  use AI::NeuralNet::SOM::Hexa;
   my $nn = new AI::NeuralNet::SOM::Hexa (output_dim => 6,
                                          input_dim  => 4);
   $nn->initialize ( [ 0, 0, 0, 0 ] );  # all get this value
+
   $nn->value (3, 2, [ 1, 1, 1, 1 ]);   # change value for a neuron
+  print $nn->value (3, 2);
+
+  $nn->label (3, 2, 'Danger');         # add a label to the neuron
+  print $nn->label (3, 2);
+
 
 =head1 DESCRIPTION
 
@@ -78,9 +92,11 @@ learning rate is reduced over the iterations.
 
 =item C<sigma0>: (optional, defaults to radius)
 
-A non-negative number representing the start value for the learning radius. It starts big, but then
-narrows as learning time progresses. This makes sure that the network finally has only localized
-changes.
+A non-negative number representing the start value for the learning radius. Practically, the value
+should be chosen in such a way to cover a larger part of the map. During the learning process this
+value will be narrowed down, so that the learning radius impacts less and less neurons.
+
+B<NOTE>: Do not choose C<1> as the C<log> function is used on this value.
 
 =back
 
@@ -122,9 +138,9 @@ zero everything:
 
 Then all vectors will get randomized values (in the range [ -0.5 .. 0.5 ]).
 
-=back
+=item using eigenvectors (see L</HOWTOS>)
 
-TODO: Eigenvectors
+=back
 
 =item I<train>
 
@@ -142,16 +158,16 @@ Example:
                [ -1, -1, -1 ], 
                [ 0, 4, -3]);
 
-TODO: @@@@@@ expose error
-
 =cut
 
 sub train {
     my $self   = shift;
     my $epochs = shift || 1;
+    die "no data to learn" unless @_;
 
     $self->{LAMBDA} = $epochs / log ($self->{_Sigma0});                                 # educated guess?
 
+    my @mes    = ();                                                                    # this will contain the errors during the epochs
     for my $epoch (1..$epochs){
 	$self->{T} = $epoch;
 	my $sigma = $self->{_Sigma0} * exp ( - $self->{T} / $self->{LAMBDA} );          # compute current radius
@@ -160,12 +176,14 @@ sub train {
 	my $sample = @_ [ int (rand (scalar @_) ) ];                                    # take random sample
 
 	my @bmu = $self->bmu ($sample);                                                 # find the best matching unit
+	push @mes, $bmu[2] if wantarray;
 #warn "bmu ".Dumper \@bmu;
 	my $neighbors = $self->neighbors ($sigma, @bmu);                                # find its neighbors
 #warn "neighbors ".Dumper $neighbors;
 	map { _adjust ($self, $l, $sigma, $_, $sample) } @$neighbors;                   # bend them like Beckham
 #warn Dumper $self;
     }
+    return @mes;
 }
 
 sub _adjust {                                                                           # http://www.ai-junkie.com/ann/som/som4.html
@@ -201,9 +219,23 @@ sub bmu { die; }
 
 =item I<mse>
 
-I<$mse> = I<$nn>->mse (I<@vectors>)
+I<$me> = I<$nn>->mean_error (I<@vectors>)
+
+This method takes a number of vectors and produces the I<mean distance>, i.e. the average I<error>
+which the SOM makes when finding the C<bmu>s for the vectors. At least one vector must be passed in.
+
+Obviously, the longer you let your SOM be trained, the smaller the error should become.
 
 =cut
+    
+sub mean_error {
+    my $self = shift;
+    my $error = 0;
+    map { $error += $_ }                    # then add them all up
+        map { ( $self->bmu($_) )[2] }       # then find the distance
+           @_;                              # take all data vectors
+    return ($error / scalar @_);            # return the mean value
+}
 
 =pod
 
@@ -259,6 +291,10 @@ sub map {
 
 =item I<value>
 
+I<$val> = I<$nn>->value (I<$x>, I<$y>)
+
+I<$nn>->value (I<$x>, I<$y>, I<$val>)
+
 Set or get the current vector value for a particular neuron. The neuron is addressed via its
 coordinates.
 
@@ -269,6 +305,25 @@ sub value {
     my ($x, $y) = (shift, shift);
     my $v       = shift;
     return $v ? $self->{map}->[$x]->[$y] = $v : $self->{map}->[$x]->[$y];
+}
+
+=pod
+
+=item I<label>
+
+I<$label> = I<$nn>->label (I<$x>, I<$y>)
+
+I<$nn>->label (I<$x>, I<$y>, I<$label>)
+
+Set or get the label for a particular neuron. The neuron is addressed via its coordinates
+
+=cut
+
+sub label {
+    my $self    = shift;
+    my ($x, $y) = (shift, shift);
+    my $l       = shift;
+    return $l ? $self->{labels}->[$x]->[$y] = $l : $self->{labels}->[$x]->[$y];
 }
 
 =pod
@@ -300,6 +355,58 @@ sub as_data { die; }
 
 =back
 
+=head1 HOWTOs
+
+=over
+
+=item I<using Eigenvectors to initialize the SOM>
+
+See the example script in the directory C<examples> provided in the
+distribution. It uses L<PDL> (for speed and scalability, but the
+results are not as good as I had thought.
+
+=item I<loading and saving a SOM>
+
+See the example script in the directory C<examples>. It uses
+C<Storable> to directly dump the data structure onto disk. Storage and
+retrieval is quite fast.
+
+=back
+
+=head1 FAQs
+
+=over
+
+=item I<I get 'uninitialized value ...' warnings, many of them>
+
+There is most likely something wrong with the C<input_dim> you
+specified and your vectors should be having.
+
+=back
+
+=head1 TODOs
+
+=over
+
+=item maybe implement the SOM on top of PDL?
+
+=item provide a ::SOM::Compat to have compatibility with the original AI::NeuralNet::SOM?
+
+=item implement different window forms (bubble/gaussian), linear/random
+
+=item implement the format mentioned in the original AI::NeuralNet::SOM
+
+=item add methods as_html to individual topologies
+
+=item add iterators through vector lists for I<initialize> and I<train>
+
+=back
+
+=head1 SUPPORT
+
+Bugs should always be submitted via the CPAN bug tracker
+
+ L<http://rt.cpan.org/Public/Search/Simple.html?q=AI%3A%3ANeuralNet%3A%3ASOM>
 
 =head1 SEE ALSO
 
@@ -319,7 +426,7 @@ at your option, any later version of Perl 5 you may have available.
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 1;
 

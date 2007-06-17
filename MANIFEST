@@ -2,6 +2,9 @@ Changes
 Makefile.PL
 MANIFEST
 README
+examples/eigenvector_initialization.pl
+examples/load_save.pl
+t/som.t
 t/rect.t
 t/hexa.t
 t/torus.t

@@ -37,11 +37,6 @@ use Data::Dumper;
 					   input_dim  => 3);
     $nn->initialize ( [ 0, 0, 1 ] );
 
-    $nn->value ( 1, 1, [ 1, 1, 1 ] );
-
-    ok (eq_array ($nn->value ( 1, 1),
-		  [ 1, 1, 1 ]), 'value set/get');
-
     ok (eq_array ($nn->bmu ([ 1, 1, 1 ]),
 		  [ 1, 1, 0 ]), 'bmu');
 }
