@@ -132,10 +132,6 @@ sub neighbors {                                                               # 
 
 =pod
 
-=over
-
-=item I<radius>
-
 =cut
 
 sub radius {
@@ -145,12 +141,14 @@ sub radius {
 
 =pod
 
+=over
+
 =item I<map>
 
 I<$m> = I<$nn>->map
 
 This method returns the 2-dimensional array of vectors in the grid (as a reference to an array of
-references to arrays of vectors. The representation of the 2-dimensional array is straightforward.
+references to arrays of vectors). The representation of the 2-dimensional array is straightforward.
 
 Example:
 

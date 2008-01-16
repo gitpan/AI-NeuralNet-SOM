@@ -1,6 +1,10 @@
 Revision history for Perl extension AI::NeuralNet::SOM.
 
-0.04  ????
+0.05  Mi 16. Jan 20:58:19 CET 2008
+	- improvement of documentation
+	- training now holds sigma and l constant during an epoch, but applies ALL vectors (exactly once)
+
+0.04  17. Jun CEST 2007
 	- added labels get/set
 	- added mean_error function
 

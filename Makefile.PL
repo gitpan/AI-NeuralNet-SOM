@@ -17,8 +17,12 @@ package MY;
 sub depend {
     return <<MAKE
 
+inject:
+	mcpani --add --module AI::NeuralNet::SOM --authorid DRRHO --modversion \$(VERSION) --file AI-NeuralNet-SOM-\$(VERSION).tar.gz
+	sudo mcpani --inject
+
 debian: 
-	(cd ; cd packages ; rm -rf libai-neuralnet-som-perl* AI-NeuralNet-SOM* ; dh-make-perl --build -cpan AI::NeuralNet::SOM::Hexa  )
+	(cd /usr/local/share/packages ; rm -rf libai-neuralnet-som-perl* AI-NeuralNet-SOM* ; dh-make-perl --cpan-mirror file:/usr/local/share/minicpan --build -cpan AI::NeuralNet::SOM  )
 
 upload:
 	cpan-upload-http AI-NeuralNet-SOM-\${VERSION}.tar.gz

@@ -39,7 +39,7 @@ use Data::Dumper;
 
     foreach (1..3) {
 	my @mes = $nn->train (20, @vs);
-	is (scalar @mes, 20, 'errors while training, nr');
+	is (scalar @mes, 3 * 20, 'errors while training, nr');
 	ok ((!grep { $_ > 10 * $me } @mes), 'errors while training, none significantly bigger');
     }
 }

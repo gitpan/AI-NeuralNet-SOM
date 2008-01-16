@@ -61,12 +61,13 @@ others. So no use of files, no arcane dependencies, etc.
 
 The basic idea is that the neural network consists of a 2-dimensional
 array of N-dimensional vectors. When the training is started these
-vectors may be complete random, but over time the network learns from
-the sample data, also N-dimensional vectors.
+vectors may be completely random, but over time the network learns
+from the sample data, which is a set of N-dimensional vectors.
 
 Slowly, the vectors in the network will try to approximate the sample
 vectors fed in. If in the sample vectors there were clusters, then
-these clusters will be neighbourhoods within the rectangle.
+these clusters will be neighbourhoods within the rectangle (or
+whatever topology you are using).
 
 Technically, you have reduced your dimension from N to 2.
 
@@ -85,10 +86,10 @@ the grid).
 
 =item C<learning_rate>: (optional, default C<0.1>)
 
-This is a magic number which influence how strongly the vectors in the grid can be
-influenced. Higher movement can mean faster learning if the clusters are very pronounced. If not,
-then the movement is like noise and the convergence is not good. To mediate that effect, the
-learning rate is reduced over the iterations.
+This is a magic number which controls how strongly the vectors in the grid can be influenced. Stronger
+movement can mean faster learning if the clusters are very pronounced. If not, then the movement is
+like noise and the convergence is not good. To mediate that effect, the learning rate is reduced
+over the iterations.
 
 =item C<sigma0>: (optional, defaults to radius)
 
@@ -146,10 +147,14 @@ Then all vectors will get randomized values (in the range [ -0.5 .. 0.5 ]).
 
 I<$nn>->train ( I<$epochs>, I<@vectors> )
 
-The training uses the list of sample vectors to make the network learn. Each vector is simply a
-reference to an array of values. Individual vectors are
+I<@mes> = I<$nn>->train ( I<$epochs>, I<@vectors> )
 
-The C<epoch> parameter controls how many vectors are processed.
+The training uses the list of sample vectors to make the network learn. Each vector is simply a
+reference to an array of values.
+
+The C<epoch> parameter controls how many vectors are processed. The vectors are B<NOT> used in
+sequence, but picked randomly from the list. For this reason it is wise to run several epochs,
+not just one. But within one epoch B<all> vectors are visited exactly once.
 
 Example:
 
@@ -168,20 +173,20 @@ sub train {
     $self->{LAMBDA} = $epochs / log ($self->{_Sigma0});                                 # educated guess?
 
     my @mes    = ();                                                                    # this will contain the errors during the epochs
-    for my $epoch (1..$epochs){
+    for my $epoch (1..$epochs)  {
 	$self->{T} = $epoch;
 	my $sigma = $self->{_Sigma0} * exp ( - $self->{T} / $self->{LAMBDA} );          # compute current radius
 	my $l     = $self->{_L0}     * exp ( - $self->{T} / $epochs );                  # current learning rate
 
-	my $sample = @_ [ int (rand (scalar @_) ) ];                                    # take random sample
+	my @veggies = @_;                                                               # make a local copy, that will be destroyed in the loop
+	while (@veggies) {
+	    my $sample = splice @veggies, int (rand (scalar @veggies) ), 1;             # find (and take out
 
-	my @bmu = $self->bmu ($sample);                                                 # find the best matching unit
-	push @mes, $bmu[2] if wantarray;
-#warn "bmu ".Dumper \@bmu;
-	my $neighbors = $self->neighbors ($sigma, @bmu);                                # find its neighbors
-#warn "neighbors ".Dumper $neighbors;
-	map { _adjust ($self, $l, $sigma, $_, $sample) } @$neighbors;                   # bend them like Beckham
-#warn Dumper $self;
+	    my @bmu = $self->bmu ($sample);                                             # find the best matching unit
+	    push @mes, $bmu[2] if wantarray;
+	    my $neighbors = $self->neighbors ($sigma, @bmu);                            # find its neighbors
+	    map { _adjust ($self, $l, $sigma, $_, $sample) } @$neighbors;               # bend them like Beckham
+	}
     }
     return @mes;
 }
@@ -217,7 +222,7 @@ sub bmu { die; }
 
 =pod
 
-=item I<mse>
+=item I<mean_error>
 
 I<$me> = I<$nn>->mean_error (I<@vectors>)
 
@@ -315,7 +320,8 @@ I<$label> = I<$nn>->label (I<$x>, I<$y>)
 
 I<$nn>->label (I<$x>, I<$y>, I<$label>)
 
-Set or get the label for a particular neuron. The neuron is addressed via its coordinates
+Set or get the label for a particular neuron. The neuron is addressed via its coordinates.
+The label can be anything, it is just attached to the position.
 
 =cut
 
@@ -363,7 +369,7 @@ sub as_data { die; }
 
 See the example script in the directory C<examples> provided in the
 distribution. It uses L<PDL> (for speed and scalability, but the
-results are not as good as I had thought.
+results are not as good as I had thought).
 
 =item I<loading and saving a SOM>
 
@@ -404,13 +410,25 @@ specified and your vectors should be having.
 
 =head1 SUPPORT
 
-Bugs should always be submitted via the CPAN bug tracker
-
- L<http://rt.cpan.org/Public/Search/Simple.html?q=AI%3A%3ANeuralNet%3A%3ASOM>
+Bugs should always be submitted via the CPAN bug tracker 
+L<https://rt.cpan.org/Dist/Display.html?Status=Active&Queue=AI-NeuralNet-SOM>
 
 =head1 SEE ALSO
 
+Explanation of the algorithm:
+
 L<http://www.ai-junkie.com/ann/som/som1.html>
+
+Old version of AI::NeuralNet::SOM from Alexander Voischev:
+
+L<http://backpan.perl.org/authors/id/V/VO/VOISCHEV/>
+
+Subclasses:
+
+L<AI::NeuralNet::Hexa>
+L<AI::NeuralNet::Rect>
+L<AI::NeuralNet::Torus>
+
 
 =head1 AUTHOR
 
@@ -418,7 +436,7 @@ Robert Barta, E<lt>rho@devc.atE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007 by Robert Barta
+Copyright (C) 200[78] by Robert Barta
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
@@ -426,7 +444,7 @@ at your option, any later version of Perl 5 you may have available.
 
 =cut
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 1;
 
