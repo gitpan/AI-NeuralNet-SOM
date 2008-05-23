@@ -180,7 +180,7 @@ sub train {
 
 	my @veggies = @_;                                                               # make a local copy, that will be destroyed in the loop
 	while (@veggies) {
-	    my $sample = splice @veggies, int (rand (scalar @veggies) ), 1;             # find (and take out
+	    my $sample = splice @veggies, int (rand (scalar @veggies) ), 1;             # find (and take out)
 
 	    my @bmu = $self->bmu ($sample);                                             # find the best matching unit
 	    push @mes, $bmu[2] if wantarray;
@@ -309,7 +309,7 @@ sub value {
     my $self    = shift;
     my ($x, $y) = (shift, shift);
     my $v       = shift;
-    return $v ? $self->{map}->[$x]->[$y] = $v : $self->{map}->[$x]->[$y];
+    return defined $v ? $self->{map}->[$x]->[$y] = $v : $self->{map}->[$x]->[$y];
 }
 
 =pod
@@ -329,7 +329,7 @@ sub label {
     my $self    = shift;
     my ($x, $y) = (shift, shift);
     my $l       = shift;
-    return $l ? $self->{labels}->[$x]->[$y] = $l : $self->{labels}->[$x]->[$y];
+    return defined $l ? $self->{labels}->[$x]->[$y] = $l : $self->{labels}->[$x]->[$y];
 }
 
 =pod
@@ -444,7 +444,7 @@ at your option, any later version of Perl 5 you may have available.
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 1;
 
