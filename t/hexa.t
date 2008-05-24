@@ -35,6 +35,18 @@ use Data::Dumper;
 {
     my $nn = new AI::NeuralNet::SOM::Hexa (output_dim => 2,
 					   input_dim  => 3);
+    $nn->initialize;
+
+    foreach my $x (0 .. $nn->diameter -1) {
+	foreach my $y (0 .. $nn->diameter -1 ) {
+	    ok ( (!grep { $_ > 0.5 || $_ < -0.5 } @{ $nn->value ( $x, $y ) }) , "$x, $y: random vectors in [-0.5, 0.5]");
+	}
+    }
+}
+
+{
+    my $nn = new AI::NeuralNet::SOM::Hexa (output_dim => 2,
+					   input_dim  => 3);
     $nn->initialize ( [ 0, 0, 1 ] );
 
     ok (eq_array ($nn->bmu ([ 1, 1, 1 ]),

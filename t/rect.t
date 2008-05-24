@@ -53,6 +53,18 @@ sub _find {
 #    print $nn->as_string;
 }
 
+{
+    my $nn = new AI::NeuralNet::SOM::Rect (output_dim => "5x6",
+					   input_dim  => 3);
+    $nn->initialize;
+
+    foreach my $x (0 .. 5 -1) {
+	foreach my $y (0 .. 6 -1 ) {
+	    ok ( (!grep { $_ > 0.5 || $_ < -0.5 } @{ $nn->value ( $x, $y ) }) , "$x, $y: random vectors in [-0.5, 0.5]");
+	}
+    }
+}
+
 __END__
 
 # randomized pick

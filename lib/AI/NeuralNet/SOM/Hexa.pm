@@ -109,7 +109,7 @@ sub initialize {
     my $get_from_stream = sub {
 	$i = 0 if $i > $#data;
 	return [ @{ $data[$i++] } ];  # cloning !
-    };
+    } if @data;
     $get_from_stream ||= sub {
 	return [ map { rand( 1 ) - 0.5 } 1..$self->{_Z} ];
     };
@@ -228,7 +228,7 @@ Robert Barta, E<lt>rho@devc.atE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007 by Robert Barta
+Copyright (C) 200[78] by Robert Barta
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
@@ -236,7 +236,7 @@ at your option, any later version of Perl 5 you may have available.
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 1;
 
